@@ -1,0 +1,17 @@
+spring:
+  datasource:
+    url: jdbc:h2:tcp://localhost/~/querydsl
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: create #애플리케이션 로딩 시점에 모든 테이블 드랍 후 다시 테이블 작성
+    properties:
+      hibernate:
+        format_sql: true
+        #show_sql: true
+        #use_sql_comments: true #JPQL 실행문을 볼 수 있음
+logging:
+  level:
+    org.hibernate.SQL: debug

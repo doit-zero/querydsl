@@ -350,17 +350,42 @@ public class QuerydslBasicTest {
 
     // 특히 stringValue()가 많이 사용될것!
     @Test
-    void concat(){
+    void concat() {
         //{username}_{age}
         List<String> result = queryFactory
                 .select(member.username.concat("_").concat(member.age.stringValue()))
                 .from(member)
                 .where(member.username.eq("member1"))
                 .fetch();
-        for (String s : result){
+        for (String s : result) {
             System.out.println("s = " + s);
         }
+    }
 
+
+    // 프로젝션!
+
+    @Test
+    void simpleProjection(){
+        List<String> result = queryFactory
+                .select(member.username)
+                .from(member)
+                .fetch();
+        System.out.println("result = " + result);
+    }
+
+    @Test
+    void tupleProjection(){
+        List<Tuple> result = queryFactory
+                .select(member.username, member.age)
+                .from(member)
+                .fetch();
+        for(Tuple tuple:result){
+            String username = tuple.get(member.username);
+            Integer age = tuple.get(member.age);
+            System.out.println("username = " + username);
+            System.out.println("age = " + age);
+        }
     }
 
 

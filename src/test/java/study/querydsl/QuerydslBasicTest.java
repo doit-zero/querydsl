@@ -590,10 +590,6 @@ public class QuerydslBasicTest {
                 .execute();
     }
 
-    @Test
-    void sqlFunction(){
-        
-    }
 
 
 }

@@ -1,7 +1,11 @@
 package study.querydsl;
 
+import com.querydsl.core.BooleanBuilder;
 import com.querydsl.core.QueryResults;
 import com.querydsl.core.Tuple;
+import com.querydsl.core.types.Predicate;
+import com.querydsl.core.types.Projections;
+import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.core.types.dsl.CaseBuilder;
 import com.querydsl.core.types.dsl.Expressions;
 import com.querydsl.jpa.JPAExpressions;
@@ -15,7 +19,11 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.annotation.Commit;
 import org.springframework.transaction.annotation.Transactional;
+import study.querydsl.dto.MemberDto;
+import study.querydsl.dto.QMemberDto;
+import study.querydsl.dto.UserDto;
 import study.querydsl.entity.Member;
 import study.querydsl.entity.QMember;
 import study.querydsl.entity.QTeam;
@@ -386,6 +394,205 @@ public class QuerydslBasicTest {
             System.out.println("username = " + username);
             System.out.println("age = " + age);
         }
+    }
+
+
+    @Test
+    void findDtoJPQL(){
+        List<MemberDto> result = em.createQuery("select new study.querydsl.dto.MemberDto(m.username,m.age) from Member m", MemberDto.class)
+                .getResultList();
+        for(MemberDto memberDto:result){
+            System.out.println("mbDto = " + memberDto);
+        }
+    }
+
+    @Test
+    void findDtoBySetter(){
+        List<MemberDto> result = queryFactory
+                .select(Projections.bean(MemberDto.class,
+                        member.username,
+                        member.age))
+                .from(member)
+                .fetch();
+        for(MemberDto memberDto:result){
+            System.out.println("mbDto = " + memberDto);
+        }
+    }
+
+    @Test
+    void findDtoByField(){
+        List<MemberDto> result = queryFactory
+                .select(Projections.fields(MemberDto.class,
+                        member.username,
+                        member.age))
+                .from(member)
+                .fetch();
+        for(MemberDto memberDto:result){
+            System.out.println("mbDto = " + memberDto);
+        }
+    }
+
+    @Test
+    void findDtoByConstructor(){
+        List<MemberDto> result = queryFactory
+                .select(Projections.constructor(MemberDto.class,
+                        member.username,
+                        member.age))
+                .from(member)
+                .fetch();
+        for(MemberDto memberDto:result){
+            System.out.println("mbDto = " + memberDto);
+        }
+    }
+
+    @Test
+    void findUserDtoByField(){
+        List<UserDto> result = queryFactory
+                .select(Projections.fields(UserDto.class,
+                        member.username.as("name"),
+                        member.age))
+                .from(member)
+                .fetch();
+        for(UserDto memberDto:result){
+            System.out.println("mbDto = " + memberDto);
+        }
+    }
+
+    @Test
+    void findUserDtoByConstructor(){
+        List<UserDto> result = queryFactory
+                .select(Projections.constructor(UserDto.class,
+                        member.username,
+                        member.age))
+                .from(member)
+                .fetch();
+        for(UserDto memberDto:result){
+            System.out.println("mbDto = " + memberDto);
+        }
+    }
+
+    @Test
+    void findDtoByQueryProjection(){
+        List<MemberDto> result = queryFactory
+                .select(new QMemberDto(member.username, member.age))
+                .from(member)
+                .fetch();
+        for (MemberDto member:result){
+            System.out.println("member = " + member);
+        }
+    }
+
+    // 동적 쿼리 ! //
+    /**
+     * 1. booleanBuilder 사용
+     * 2. where 다중 파라미터 사용
+     * */
+    @Test
+    void dynamicQuery_BooleanBuilder(){
+        String usernameParam = "member1";
+        Integer ageParam = null;
+
+        List<Member> result = searchMember1(usernameParam,ageParam);
+        assertThat(result.size()).isEqualTo(1);
+    }
+
+    @Test
+    void dynamicQuery_WhereParam(){
+        String usernameParam = "member1";
+        Integer ageParam = null;
+
+        List<Member> result = searchMember2(usernameParam,ageParam);
+        assertThat(result.size()).isEqualTo(1);
+    }
+
+    private List<Member> searchMember2(String usernameParam, Integer ageParam) {
+        return queryFactory
+                .selectFrom(member)
+                .where(usernameEq(usernameParam),ageEq(ageParam))
+                //.where(allEq(usernameParam,ageParam))
+                .fetch();
+    }
+
+    private BooleanExpression ageEq(Integer ageParam) {
+        return ageParam != null ? member.age.eq(ageParam) : null;
+    }
+
+    private BooleanExpression usernameEq(String usernameParam) {
+        return usernameParam != null ? member.username.eq(usernameParam) : null;
+    }
+
+    private BooleanExpression allEq(String usernameCond,Integer ageCond){
+        return usernameEq(usernameCond).and(ageEq(ageCond));
+    }
+
+    private List<Member> searchMember1(String usernameCond,Integer ageCond){
+
+        BooleanBuilder builder = new BooleanBuilder();
+
+        if(usernameCond != null){
+            builder.and(member.username.eq(usernameCond));
+        }
+
+        if(ageCond != null){
+            builder.and(member.age.eq(ageCond));
+        }
+
+        return queryFactory
+                .selectFrom(member)
+                .where(builder)
+                .fetch();
+    }
+
+    /**
+     * 수정,삭제 배치 쿼리
+     * 벌크 연산이란 한번에 여러 데이터를 수정 또는 삭제하는 작업
+     * */
+
+    @Test
+    //@Commit
+    void bulkUpdate(){
+        /**
+         * 벌크 연산 주의 점
+         * 1. 벌크 연산을 한다고 영속성 컨텍스트의 내용이 바뀌지 않음, 1차 캐시를 무시하고 바로 디비 데이터를 바꾸기 때문
+         *  문제가 되는 것은 디비에서 데이터를 불러와도 영속성 컨텍스트가 우선권을 가지기 때문에 영속성 컨텍스트의 데이터가 유지됨
+         *  그래서 em.flush(); em.clear();로 영속성 컨텍스트를 초기화 시켜줌
+         *  !항상 주의 할 것은 벌크 연산 후에는 반드시 영속성 컨텍스트를 초기화 시켜야한다!
+         * */
+
+        long count = queryFactory
+                .update(member)
+                .set(member.username, "비회원")
+                .where(member.age.lt(28))
+                .execute();
+
+        em.flush();
+        em.clear();
+
+        List<Member> result = queryFactory.selectFrom(member).fetch();
+        for(Member member : result){
+            System.out.println("member = " + member);
+        }
+    }
+
+    @Test
+    void bulkAdd(){
+        queryFactory
+                .update(member)
+                .set(member.age,member.age.add(1))
+                .execute();
+    }
+
+    @Test
+    void bulkDelete(){
+        queryFactory
+                .delete(member)
+                .where(member.age.gt(18))
+                .execute();
+    }
+
+    @Test
+    void sqlFunction(){
+        
     }
 
 
